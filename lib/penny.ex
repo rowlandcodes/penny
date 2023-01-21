@@ -1,7 +1,8 @@
 defmodule Penny do
   import Plug.Conn
 
-  @type success_handler :: (result :: term, assigns :: Plug.Conn.assigns() -> iodata())
+  @type result :: term
+  @type success_handler :: (result :: result, assigns :: Plug.Conn.assigns() -> iodata())
   @type timeout_handler :: (assigns :: Plug.Conn.assigns() -> iodata())
   @type error_handler :: (assigns :: Plug.Conn.assigns() -> iodata())
 
@@ -19,7 +20,9 @@ defmodule Penny do
 
   @type send_options :: [send_option]
 
-  @spec send_chunks(Plug.Conn.t(), Enumerable.t(iodata() | Penny.MarkedAsync.t()), send_options) ::
+  @opaque marked_async :: Penny.MarkedAsync.t()
+
+  @spec send_chunks(Plug.Conn.t(), Enumerable.t(iodata() | marked_async), send_options) ::
           Plug.Conn.t()
   def send_chunks(conn, chunks, options \\ []) do
     conn = send_chunked(conn, 200)
@@ -39,12 +42,12 @@ defmodule Penny do
     end)
   end
 
-  @spec mark_async((() -> any), marked_options) :: Penny.MarkedAsync.t()
+  @spec mark_async((() -> result), marked_options) :: marked_async
   def mark_async(fun, options \\ []) when is_function(fun, 0) do
     mark_async(:erlang, :apply, [fun, []], options)
   end
 
-  @spec mark_async(module, atom, [term], marked_options) :: Penny.MarkedAsync.t()
+  @spec mark_async(module, atom, [term], marked_options) :: marked_async
   def mark_async(module, function_name, args, options \\ [])
       when is_atom(module) and is_atom(function_name) and is_list(args) do
     timeout = Keyword.get(options, :timeout, 5000)
