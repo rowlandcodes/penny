@@ -665,7 +665,7 @@ defimpl Penny.Discriminate, for: Penny.MarkedAsync do
   def kind(term), do: {:async, term}
 end
 
-defimpl Penny.Discriminate, for: String do
+defimpl Penny.Discriminate, for: BitString do
   def kind(term), do: {:now, term}
 end
 
