@@ -1,15 +1,69 @@
 defmodule Penny.MarkedAsync do
-  defstruct mfa: nil, timeout: 5000, success_handler: nil, error_handler: nil, timeout_handler: nil
+  @moduledoc false
+  @type mfa_or_fun :: {module, atom, [term]} | (() -> term())
+  @opaque t :: %__MODULE__{
+            mfa: mfa_or_fun,
+            timeout: timeout,
+            success_handler: Penny.success_handler(),
+            error_handler: Penny.error_handler(),
+            timeout_handler: Penny.timeout_handler()
+          }
+  defstruct mfa: nil,
+            timeout: 5000,
+            success_handler: nil,
+            error_handler: nil,
+            timeout_handler: nil
+
+  @doc false
+  @spec get_mfa(t) :: {module, atom, [term]} | (() -> term())
+  def get_mfa(struct), do: struct.mfa
+
+  @doc false
+  @spec get_timeout(t) :: timeout
+  def get_timeout(struct), do: struct.timeout
+
+  @doc false
+  @spec get_success_handler(t) :: Penny.success_handler()
+  def get_success_handler(struct), do: struct.success_handler
+
+  @doc false
+  @spec get_timeout_handler(t) :: Penny.timeout_handler()
+  def get_timeout_handler(struct), do: struct.timeout_handler
+
+  @doc false
+  @spec get_error_handler(t) :: Penny.error_handler()
+  def get_error_handler(struct), do: struct.error_handler
+
+  @doc false
+  @spec create(
+          mfa_or_fun,
+          timeout,
+          Penny.success_handler(),
+          Penny.error_handler(),
+          Penny.timeout_handler()
+        ) :: t
+  def create(mfa, timeout, success_handler, error_handler, timeout_handler) do
+    %Penny.MarkedAsync{
+      mfa: mfa,
+      timeout: timeout,
+      success_handler: success_handler,
+      error_handler: error_handler,
+      timeout_handler: timeout_handler
+    }
+  end
 end
 
 defmodule Penny.Supervised do
   @moduledoc false
   @ref_timeout 5000
+  alias Penny.MarkedAsync
 
+  @doc false
   def start(owner) do
     {:ok, :proc_lib.spawn(__MODULE__, :reply, [owner])}
   end
 
+  @doc false
   def reply({_, _, owner_pid} = owner) do
     mref = Process.monitor(owner_pid)
     reply(owner, owner_pid, mref, @ref_timeout)
@@ -20,7 +74,7 @@ defmodule Penny.Supervised do
       {^owner_pid, ref, reply_to, callers, mfa} ->
         initial_call(mfa)
         put_callers(callers)
-        _ = mref && Process.demonitor(mref, [:flush])
+        _ = Process.demonitor(mref, [:flush])
         send(reply_to, {ref, invoke_mfa(owner, mfa)})
 
       {:DOWN, ^mref, _, _, reason} ->
@@ -157,6 +211,7 @@ defmodule Penny.Supervised do
 
   ## Stream
 
+  @doc false
   def stream(enumerable, acc, reducer, callers, options, spawn) do
     next = &Enumerable.reduce(enumerable, &1, fn x, acc -> {:suspend, [x | acc]} end)
     max_concurrency = Keyword.get(options, :max_concurrency, System.schedulers_online())
@@ -255,22 +310,22 @@ defmodule Penny.Supervised do
             # If the task replied, we don't care whether it went down for timeout
             # or for normal reasons.
             %{^position => {_, {:ok, value, element}}} ->
-              success_handler = Map.get(element, :success_handler)
-              {:ok, value, fallback(success_handler, &default_success_handler/2)}
+              success_handler = MarkedAsync.get_success_handler(element)
+              {:ok, value, success_handler}
 
             # If the task exited by itself before replying, we emit {:exit, reason}.
             %{^position => {_, :running, element}}
             when kind == :down ->
-              error_handler = Map.get(element, :error_handler)
-              {:error, fallback(error_handler, &default_error_handler/1)}
+              error_handler = MarkedAsync.get_error_handler(element)
+              {:error, error_handler}
 
             # If the task timed out before replying, we either exit (on_timeout: :exit)
             # or emit {:exit, :timeout} (on_timeout: :kill_task) (note the task is already
             # dead at this point).
             %{^position => {_, :running, element}}
             when kind == :timed_out ->
-              timeout_handler = Map.get(element, :timeout_handler)
-              {:timeout, fallback(timeout_handler, &default_timeout_handler/1)}
+              timeout_handler = MarkedAsync.get_timeout_handler(element)
+              {:timeout, timeout_handler}
           end
 
         waiting = Map.put(waiting, position, {:done, result})
@@ -392,8 +447,8 @@ defmodule Penny.Supervised do
       callers: callers
     } = config
 
-    spawn_timeout = value.timeout
-    mfa = value.mfa
+    spawn_timeout = MarkedAsync.get_timeout(value)
+    mfa = MarkedAsync.get_mfa(value)
 
     send(monitor_pid, {:spawn, spawned, spawn_timeout})
 
@@ -595,17 +650,14 @@ defmodule Penny.Supervised do
 
   defp normalize_mfa({mod, fun, args}), do: {mod, fun, args}
   defp normalize_mfa(fun), do: {:erlang, :apply, [fun, []]}
-
-  defp default_success_handler(value, _assigns), do: value
-  defp default_error_handler(_), do: ""
-  defp default_timeout_handler(_), do: ""
-
-  defp fallback(nil, default), do: default
-  defp fallback(value, _), do: value
 end
 
 defprotocol Penny.Discriminate do
-  @fallback_to_any true
+  @moduledoc """
+  Extensible
+  """
+  @doc false
+  @spec kind(t) :: {:async, Penny.MarkedAsync.t()} | {:now, iodata()}
   def kind(term)
 end
 
@@ -613,6 +665,10 @@ defimpl Penny.Discriminate, for: Penny.MarkedAsync do
   def kind(term), do: {:async, term}
 end
 
-defimpl Penny.Discriminate, for: Any do
+defimpl Penny.Discriminate, for: String do
+  def kind(term), do: {:now, term}
+end
+
+defimpl Penny.Discriminate, for: List do
   def kind(term), do: {:now, term}
 end
