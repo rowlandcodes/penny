@@ -2,9 +2,9 @@ defmodule Penny do
   import Plug.Conn
 
   @type result :: term
-  @type success_handler :: (result :: result, assigns :: Plug.Conn.assigns() -> iodata())
-  @type timeout_handler :: (assigns :: Plug.Conn.assigns() -> iodata())
-  @type error_handler :: (assigns :: Plug.Conn.assigns() -> iodata())
+  @type success_handler :: (result :: result, assigns :: Plug.Conn.assigns() -> Plug.Conn.body())
+  @type timeout_handler :: (assigns :: Plug.Conn.assigns() -> Plug.Conn.body())
+  @type error_handler :: (assigns :: Plug.Conn.assigns() -> Plug.Conn.body())
 
   @type marked_option ::
           {:timeout, timeout}
@@ -22,7 +22,7 @@ defmodule Penny do
 
   @opaque marked_async :: Penny.MarkedAsync.t()
 
-  @spec send_chunks(Plug.Conn.t(), Enumerable.t(iodata() | marked_async), send_options) ::
+  @spec send_chunks(Plug.Conn.t(), Enumerable.t(Plug.Conn.body() | marked_async), send_options) ::
           Plug.Conn.t()
   def send_chunks(conn, chunks, options \\ []) do
     conn = send_chunked(conn, 200)
