@@ -1,7 +1,4 @@
 defmodule Penny do
-  @moduledoc """
-  Penny
-  """
   import Plug.Conn
 
   @type success_handler :: (result :: term, assigns :: Plug.Conn.assigns() -> iodata())
@@ -22,9 +19,6 @@ defmodule Penny do
 
   @type send_options :: [send_option]
 
-  @doc """
-  Send chunks
-  """
   @spec send_chunks(Plug.Conn.t(), Enumerable.t(iodata() | Penny.MarkedAsync.t()), send_options) ::
           Plug.Conn.t()
   def send_chunks(conn, chunks, options \\ []) do
@@ -45,17 +39,11 @@ defmodule Penny do
     end)
   end
 
-  @doc """
-  Bogus doc
-  """
   @spec mark_async((() -> any), marked_options) :: Penny.MarkedAsync.t()
   def mark_async(fun, options \\ []) when is_function(fun, 0) do
     mark_async(:erlang, :apply, [fun, []], options)
   end
 
-  @doc """
-  Bogus doc
-  """
   @spec mark_async(module, atom, [term], marked_options) :: Penny.MarkedAsync.t()
   def mark_async(module, function_name, args, options \\ [])
       when is_atom(module) and is_atom(function_name) and is_list(args) do
