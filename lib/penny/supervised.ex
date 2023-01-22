@@ -359,7 +359,7 @@ defmodule Penny.Supervised do
   end
 
   defp discriminate_value(value, spawned, waiting, config, acc, max, delivered, next) do
-    case Penny.Discriminate.kind(value) do
+    case timing(value) do
       {:async, value} ->
         waiting = stream_spawn(value, spawned, waiting, config)
         stream_reduce({:cont, acc}, max - 1, spawned + 1, delivered, waiting, next, config)
@@ -369,6 +369,13 @@ defmodule Penny.Supervised do
         stream_deliver({:cont, acc}, max, spawned + 1, delivered, waiting, next, config)
     end
   end
+
+  @spec timing(Penny.MarkedAsync.t() | iodata()) ::
+          {:async, Penny.MarkedAsync.t()} | {:now, iodata()}
+  defp timing(value)
+
+  defp timing(%Penny.MarkedAsync{} = value), do: {:async, value}
+  defp timing(value), do: {:now, value}
 
   defp stream_deliver({:suspend, acc}, max, spawned, delivered, waiting, next, config) do
     continuation = &stream_deliver(&1, max, spawned, delivered, waiting, next, config)
@@ -650,25 +657,4 @@ defmodule Penny.Supervised do
 
   defp normalize_mfa({mod, fun, args}), do: {mod, fun, args}
   defp normalize_mfa(fun), do: {:erlang, :apply, [fun, []]}
-end
-
-defprotocol Penny.Discriminate do
-  @moduledoc """
-  Extensible
-  """
-  @doc false
-  @spec kind(t) :: {:async, Penny.MarkedAsync.t()} | {:now, iodata()}
-  def kind(term)
-end
-
-defimpl Penny.Discriminate, for: Penny.MarkedAsync do
-  def kind(term), do: {:async, term}
-end
-
-defimpl Penny.Discriminate, for: BitString do
-  def kind(term), do: {:now, term}
-end
-
-defimpl Penny.Discriminate, for: List do
-  def kind(term), do: {:now, term}
 end
