@@ -22,9 +22,9 @@ defmodule Penny do
 
   @opaque marked_async :: Penny.MarkedAsync.t()
 
-  @spec send_chunks(Plug.Conn.t(), Enumerable.t(Plug.Conn.body() | marked_async), send_options) ::
+  @spec send_chunk_stream(Plug.Conn.t(), Enumerable.t(Plug.Conn.body() | marked_async), send_options) ::
           Plug.Conn.t()
-  def send_chunks(conn, chunks, options \\ []) do
+  def send_chunk_stream(conn, chunks, options \\ []) do
     conn = send_chunked(conn, 200)
 
     chunks
