@@ -22,7 +22,11 @@ defmodule Penny do
 
   @opaque marked_async :: Penny.MarkedAsync.t()
 
-  @spec send_chunk_stream(Plug.Conn.t(), Enumerable.t(Plug.Conn.body() | marked_async), send_options) ::
+  @spec send_chunk_stream(
+          Plug.Conn.t(),
+          Enumerable.t(Plug.Conn.body() | marked_async),
+          send_options
+        ) ::
           Plug.Conn.t()
   def send_chunk_stream(conn, chunks, options \\ []) do
     conn = send_chunked(conn, 200)
@@ -33,6 +37,22 @@ defmodule Penny do
       result = handle_output(chunk, conn.assigns)
 
       case Plug.Conn.chunk(conn, result) do
+        {:ok, conn} ->
+          {:cont, conn}
+
+        {:error, :closed} ->
+          {:halt, conn}
+      end
+    end)
+  end
+
+  @spec send_chunk_stream_no_async(Plug.Conn.t(), Enumerable.t(Plug.Conn.body())) :: Plug.Conn.t()
+  def send_chunk_stream_no_async(conn, chunks) do
+    conn = send_chunked(conn, 200)
+
+    chunks
+    |> Enum.reduce_while(conn, fn chunk, conn ->
+      case Plug.Conn.chunk(conn, chunk) do
         {:ok, conn} ->
           {:cont, conn}
 
