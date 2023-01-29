@@ -370,11 +370,10 @@ defmodule Penny.Supervised do
     end
   end
 
-  @spec timing(Penny.MarkedAsync.t() | iodata()) ::
-          {:async, Penny.MarkedAsync.t()} | {:now, iodata()}
-  defp timing(value)
-
+  @spec timing(Penny.MarkedAsync.t()) :: {:async, Penny.MarkedAsync.t()}
   defp timing(%Penny.MarkedAsync{} = value), do: {:async, value}
+
+  @spec timing(iodata()) :: {:now, iodata()}
   defp timing(value), do: {:now, value}
 
   defp stream_deliver({:suspend, acc}, max, spawned, delivered, waiting, next, config) do
